@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 圖片生成工具</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface2: #252840;
+      --border: #2e3250;
+      --accent: #6c63ff;
+      --accent2: #a78bfa;
+      --text: #e2e8f0;
+      --text2: #94a3b8;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo svg { color: var(--accent); }
+    .logo h1 { font-size: 18px; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .header-actions { display: flex; gap: 8px; }
+    .btn-icon {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      width: 38px; height: 38px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .2s;
+    }
+    .btn-icon:hover { background: var(--border); color: var(--text); }
+
+    /* Layout */
+    .container { display: flex; flex: 1; gap: 0; overflow: hidden; height: calc(100vh - 65px); }
+
+    /* Left Panel */
+    .panel-left {
+      width: 380px;
+      min-width: 320px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 20px;
+      gap: 16px;
+    }
+
+    /* Right Panel */
+    .panel-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    /* Section headers */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 8px;
+    }
+
+    /* Drop Zone */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 28px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+      background: var(--surface2);
+      position: relative;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(108,99,255,.08);
+    }
+    .drop-zone input[type=file] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .drop-zone-icon { font-size: 36px; margin-bottom: 8px; }
+    .drop-zone p { color: var(--text2); font-size: 13px; }
+    .drop-zone p strong { color: var(--text); }
+
+    /* Image Preview */
+    .preview-container {
+      position: relative;
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+    }
+    .preview-container img {
+      width: 100%;
+      max-height: 220px;
+      object-fit: contain;
+      display: block;
+    }
+    .preview-remove {
+      position: absolute;
+      top: 8px; right: 8px;
+      background: rgba(0,0,0,.7);
+      border: none;
+      color: white;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .preview-name {
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--text2);
+      border-top: 1px solid var(--border);
+    }
+
+    /* Prompt */
+    textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 12px;
+      font-size: 14px;
+      resize: vertical;
+      min-height: 100px;
+      font-family: inherit;
+      line-height: 1.6;
+      transition: border-color .2s;
+    }
+    textarea:focus { outline: none; border-color: var(--accent); }
+    textarea::placeholder { color: var(--text2); }
+
+    /* Settings Grid */
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field-group { display: flex; flex-direction: column; gap: 6px; }
+    .field-row { display: flex; gap: 6px; }
+    label { font-size: 12px; color: var(--text2); }
+    input[type=number], select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 13px;
+      width: 100%;
+      transition: border-color .2s;
+    }
+    input[type=number]:focus, select:focus { outline: none; border-color: var(--accent); }
+    select option { background: var(--surface2); }
+
+    /* Mode Toggle */
+    .mode-toggle {
+      display: flex;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 3px;
+    }
+    .mode-btn {
+      flex: 1;
+      padding: 7px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text2);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all .2s;
+      font-weight: 500;
+    }
+    .mode-btn.active {
+      background: var(--accent);
+      color: white;
+    }
+
+    /* Generate Button */
+    .btn-generate {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      border: none;
+      border-radius: var(--radius);
+      color: white;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-generate:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-generate:active { transform: translateY(0); }
+    .btn-generate:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+    /* Spinner */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Gallery */
+    .gallery-header {
+      padding: 16px 20px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .gallery-title { font-size: 14px; font-weight: 600; color: var(--text2); }
+    .gallery-count {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: 12px;
+      color: var(--text2);
+    }
+    .gallery {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+      align-content: start;
+    }
+
+    /* Empty State */
+    .empty-state {
+      grid-column: 1/-1;
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--text2);
+    }
+    .empty-state-icon { font-size: 64px; margin-bottom: 16px; opacity: .3; }
+    .empty-state p { font-size: 14px; }
+
+    /* Gallery Card */
+    .gallery-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: all .2s;
+      position: relative;
+    }
+    .gallery-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(108,99,255,.15); }
+    .card-img-wrap {
+      position: relative;
+      aspect-ratio: 1;
+      background: var(--surface2);
+      overflow: hidden;
+    }
+    .gallery-card img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .card-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,.6);
+      opacity: 0;
+      transition: opacity .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .gallery-card:hover .card-overlay { opacity: 1; }
+    .overlay-btn {
+      background: rgba(255,255,255,.15);
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255,255,255,.2);
+      color: white;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: background .2s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .overlay-btn:hover { background: rgba(255,255,255,.25); }
+    .card-info {
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+    }
+    .card-prompt {
+      font-size: 12px;
+      color: var(--text);
+      margin-bottom: 4px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-meta { font-size: 11px; color: var(--text2); }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.7);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      width: 420px;
+      max-width: 95vw;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal h2 { font-size: 16px; margin-bottom: 20px; color: var(--text); }
+    .modal .field-group { margin-bottom: 14px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .btn-secondary {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all .2s;
+    }
+    .btn-secondary:hover { border-color: var(--accent); }
+    .btn-primary {
+      background: var(--accent);
+      border: none;
+      color: white;
+      padding: 9px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: opacity .2s;
+    }
+    .btn-primary:hover { opacity: .85; }
+
+    /* Toast */
+    .toast-container {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      max-width: 300px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: slideIn .3s ease;
+      box-shadow: 0 4px 20px rgba(0,0,0,.3);
+    }
+    .toast.success { border-color: var(--success); }
+    .toast.error { border-color: var(--error); }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } }
+
+    /* Lightbox */
+    .lightbox {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.9);
+      z-index: 400;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .lightbox.open { display: flex; }
+    .lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; object-fit: contain; }
+    .lightbox-close {
+      position: absolute;
+      top: 20px; right: 20px;
+      background: rgba(255,255,255,.15);
+      border: none;
+      color: white;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    /* DPI row */
+    .dpi-info { font-size: 11px; color: var(--text2); margin-top: 4px; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+    /* Paste hint */
+    .paste-hint {
+      font-size: 11px;
+      color: var(--text2);
+      text-align: center;
+      margin-top: 6px;
+    }
+    kbd {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 11px;
+      font-family: monospace;
+    }
+
+    @media (max-width: 768px) {
+      .container { flex-direction: column; height: auto; }
+      .panel-left { width: 100%; min-width: unset; border-right: none; border-bottom: 1px solid var(--border); }
+      .panel-right { height: 60vh; }
+      .settings-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+    </svg>
+    <h1>AI 圖片生成工具</h1>
+  </div>
+  <div class="header-actions">
+    <button class="btn-icon" onclick="clearGallery()" title="清除記錄">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+      </svg>
+    </button>
+    <button class="btn-icon" onclick="openSettings()" title="設定">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+        <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<!-- Main Layout -->
+<div class="container">
+  <!-- Left Panel: Controls -->
+  <div class="panel-left">
+
+    <!-- Mode -->
+    <div>
+      <div class="section-label">生成模式</div>
+      <div class="mode-toggle">
+        <button class="mode-btn active" onclick="setMode('text')" id="mode-text">✏️ 純文字生成</button>
+        <button class="mode-btn" onclick="setMode('edit')" id="mode-edit">🖼️ 圖片+描述</button>
+      </div>
+    </div>
+
+    <!-- Image Input (hidden in text mode) -->
+    <div id="input-section">
+      <div class="section-label">參考圖片來源</div>
+      <div class="drop-zone" id="dropZone" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+        <input type="file" id="fileInput" accept="image/*" multiple onchange="onFileSelect(event)">
+        <div class="drop-zone-icon">📁</div>
+        <p><strong>拖曳圖片</strong>至此處</p>
+        <p>或點擊選擇檔案</p>
+      </div>
+      <p class="paste-hint"><kbd>Ctrl+V</kbd> 可直接貼上剪貼簿圖片</p>
+      <div id="previewList"></div>
+    </div>
+
+    <!-- Prompt -->
+    <div>
+      <div class="section-label">描述 / Prompt</div>
+      <textarea id="prompt" rows="4" placeholder="描述你想要生成的圖片內容...&#10;例如：一隻在雪地中奔跑的金色拉布拉多犬，電影感光線，4K 超高畫質"></textarea>
+    </div>
+
+    <!-- Output Settings -->
+    <div>
+      <div class="section-label">輸出設定</div>
+      <div class="settings-grid">
+        <div class="field-group">
+          <label>寬度</label>
+          <div class="field-row">
+            <input type="number" id="outWidth" value="1024" min="64" max="4096">
+          </div>
+        </div>
+        <div class="field-group">
+          <label>高度</label>
+          <div class="field-row">
+            <input type="number" id="outHeight" value="1024" min="64" max="4096">
+          </div>
+        </div>
+        <div class="field-group">
+          <label>單位</label>
+          <select id="outUnit" onchange="onUnitChange()">
+            <option value="px">像素 (px)</option>
+            <option value="mm">公釐 (mm)</option>
+            <option value="cm">公分 (cm)</option>
+            <option value="in">英吋 (in)</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label>格式</label>
+          <select id="outFormat">
+            <option value="image/png">PNG</option>
+            <option value="image/jpeg">JPG</option>
+            <option value="image/webp">WebP</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-group" style="margin-top:10px" id="dpiGroup">
+        <label>DPI（mm/cm/in 轉換用）</label>
+        <select id="outDpi">
+          <option value="72">72 DPI（螢幕）</option>
+          <option value="96">96 DPI（螢幕標準）</option>
+          <option value="150">150 DPI（低解析度印刷）</option>
+          <option value="300" selected>300 DPI（印刷品質）</option>
+        </select>
+        <div class="dpi-info" id="dpiInfo"></div>
+      </div>
+      <div class="field-group" style="margin-top:10px">
+        <label>生成數量</label>
+        <select id="outCount">
+          <option value="1">1 張</option>
+          <option value="2">2 張</option>
+          <option value="3">3 張</option>
+          <option value="4">4 張</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Generate Button -->
+    <button class="btn-generate" id="generateBtn" onclick="generate()">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+      </svg>
+      開始生成
+    </button>
+
+  </div>
+
+  <!-- Right Panel: Gallery -->
+  <div class="panel-right">
+    <div class="gallery-header">
+      <span class="gallery-title">生成結果</span>
+      <span class="gallery-count" id="galleryCount">0 張</span>
+    </div>
+    <div class="gallery" id="gallery">
+      <div class="empty-state">
+        <div class="empty-state-icon">🎨</div>
+        <p>輸入描述後點擊「開始生成」</p>
+        <p style="margin-top:8px;font-size:12px">生成的圖片將顯示在這裡</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>⚙️ API 設定</h2>
+
+    <div class="field-group">
+      <label>AI 服務商</label>
+      <select id="settingsProvider" onchange="onProviderChange()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:13px">
+        <option value="google">Google（Gemini / Imagen）</option>
+        <option value="openai">OpenAI（DALL-E 3）⭐ 品質最佳</option>
+      </select>
+    </div>
+
+    <div id="googleSettings">
+      <div class="field-group" style="margin-top:14px">
+        <label>Google Gemini API Key</label>
+        <input type="password" id="settingsApiKey" placeholder="AIzaSy..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:13px">
+      </div>
+      <div class="field-group" style="margin-top:14px">
+        <label>Google 模型</label>
+        <select id="settingsModel" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:13px">
+          <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image ⭐ 推薦</option>
+          <option value="gemini-3.1-flash-image-preview">Gemini 3.1 Flash Image（圖片編輯）</option>
+          <option value="imagen-4.0-ultra-generate-001">Imagen 4.0 Ultra（高品質）</option>
+          <option value="imagen-4.0-generate-001">Imagen 4.0 Standard</option>
+          <option value="imagen-4.0-fast-generate-001">Imagen 4.0 Fast（快速）</option>
+          <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="openaiSettings" style="display:none">
+      <div class="field-group" style="margin-top:14px">
+        <label>OpenAI API Key</label>
+        <input type="password" id="settingsOpenaiKey" placeholder="sk-..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:13px">
+        <div style="font-size:11px;color:var(--text2);margin-top:6px">取得：<a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--accent2)">platform.openai.com/api-keys</a>｜費用約 $0.04/張</div>
+      </div>
+      <div class="field-group" style="margin-top:14px">
+        <label>DALL-E 模型</label>
+        <select id="settingsDalleModel" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:13px">
+          <option value="dall-e-3">DALL-E 3（推薦）</option>
+          <option value="dall-e-2">DALL-E 2（較舊）</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeSettings()">取消</button>
+      <button class="btn-primary" onclick="saveSettings()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightboxImg" src="" alt="">
+</div>
+
+<!-- Toast -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────
+let provider = localStorage.getItem('ai_provider') || 'google';
+let apiKey = localStorage.getItem('gemini_api_key') || 'AIzaSyCtHUABpyte5L7WelyZtCTV6zbPXYe7pdk';
+let model = localStorage.getItem('gemini_model') || 'gemini-3-pro-image-preview';
+let openaiKey = localStorage.getItem('openai_api_key') || '';
+let dalleModel = localStorage.getItem('dalle_model') || 'dall-e-3';
+let currentMode = 'text';
+let uploadedImages = [];
+let galleryItems = [];
+
+// ── Init ───────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  updateDpiInfo();
+  document.getElementById('outUnit').dispatchEvent(new Event('change'));
+  updateInputSection();
+});
+
+// Ctrl+V paste
+document.addEventListener('paste', (e) => {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      const file = item.getAsFile();
+      if (file) addImage(file);
+    }
+  }
+});
+
+// ── Mode ───────────────────────────────────────────────────────────────
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('mode-text').classList.toggle('active', mode === 'text');
+  document.getElementById('mode-edit').classList.toggle('active', mode === 'edit');
+  updateInputSection();
+}
+
+function updateInputSection() {
+  document.getElementById('input-section').style.display = currentMode === 'edit' ? 'block' : 'none';
+}
+
+// ── Drag & Drop ────────────────────────────────────────────────────────
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.add('dragover');
+}
+function onDragLeave(e) {
+  document.getElementById('dropZone').classList.remove('dragover');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('dragover');
+  const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+  files.forEach(addImage);
+}
+function onFileSelect(e) {
+  [...e.target.files].forEach(addImage);
+  e.target.value = '';
+}
+
+function addImage(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const id = Date.now() + Math.random();
+    uploadedImages.push({ id, file, dataUrl: e.target.result, name: file.name });
+    renderPreviews();
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeImage(id) {
+  uploadedImages = uploadedImages.filter(i => i.id !== id);
+  renderPreviews();
+}
+
+function renderPreviews() {
+  const container = document.getElementById('previewList');
+  container.innerHTML = '';
+  uploadedImages.forEach(img => {
+    const div = document.createElement('div');
+    div.className = 'preview-container';
+    div.style.marginTop = '10px';
+    div.innerHTML = `
+      <img src="${img.dataUrl}" alt="${img.name}">
+      <button class="preview-remove" onclick="removeImage(${img.id})">✕</button>
+      <div class="preview-name">📎 ${img.name}</div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+// ── Unit Conversion ────────────────────────────────────────────────────
+function onUnitChange() {
+  const unit = document.getElementById('outUnit').value;
+  const dpiGroup = document.getElementById('dpiGroup');
+  dpiGroup.style.display = unit === 'px' ? 'none' : 'block';
+  updateDpiInfo();
+}
+
+function updateDpiInfo() {
+  const unit = document.getElementById('outUnit').value;
+  const dpi = parseInt(document.getElementById('outDpi').value);
+  const w = parseFloat(document.getElementById('outWidth').value) || 0;
+  const h = parseFloat(document.getElementById('outHeight').value) || 0;
+  let px_w, px_h;
+  if (unit === 'mm') { px_w = Math.round(w / 25.4 * dpi); px_h = Math.round(h / 25.4 * dpi); }
+  else if (unit === 'cm') { px_w = Math.round(w / 2.54 * dpi); px_h = Math.round(h / 2.54 * dpi); }
+  else if (unit === 'in') { px_w = Math.round(w * dpi); px_h = Math.round(h * dpi); }
+  if (unit !== 'px') {
+    document.getElementById('dpiInfo').textContent = `→ 實際像素：${px_w} × ${px_h} px`;
+  }
+}
+
+function getPixelDimensions() {
+  const unit = document.getElementById('outUnit').value;
+  const dpi = parseInt(document.getElementById('outDpi').value);
+  let w = parseFloat(document.getElementById('outWidth').value) || 1024;
+  let h = parseFloat(document.getElementById('outHeight').value) || 1024;
+  if (unit === 'mm') { w = Math.round(w / 25.4 * dpi); h = Math.round(h / 25.4 * dpi); }
+  else if (unit === 'cm') { w = Math.round(w / 2.54 * dpi); h = Math.round(h / 2.54 * dpi); }
+  else if (unit === 'in') { w = Math.round(w * dpi); h = Math.round(h * dpi); }
+  return { w: Math.max(64, Math.min(4096, w)), h: Math.max(64, Math.min(4096, h)) };
+}
+
+document.getElementById('outWidth').addEventListener('input', updateDpiInfo);
+document.getElementById('outHeight').addEventListener('input', updateDpiInfo);
+document.getElementById('outDpi').addEventListener('change', updateDpiInfo);
+
+// ── Generate ───────────────────────────────────────────────────────────
+async function generate() {
+  const prompt = document.getElementById('prompt').value.trim();
+  if (!prompt) { showToast('請輸入描述內容', 'error'); return; }
+  if (!apiKey) { showToast('請先設定 API Key', 'error'); openSettings(); return; }
+  if (currentMode === 'edit' && uploadedImages.length === 0) {
+    showToast('請先上傳參考圖片', 'error'); return;
+  }
+
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> 生成中...';
+
+  const count = parseInt(document.getElementById('outCount').value);
+  const { w, h } = getPixelDimensions();
+  const format = document.getElementById('outFormat').value;
+
+  const tasks = Array.from({ length: count }, (_, i) => generateOne(prompt, w, h, format, i));
+  const results = await Promise.allSettled(tasks);
+
+  let successCount = 0;
+  results.forEach(r => { if (r.status === 'fulfilled' && r.value) successCount++; });
+  if (successCount > 0) showToast(`成功生成 ${successCount} 張圖片 🎉`, 'success');
+  else showToast('生成失敗，請檢查 API Key 或網路', 'error');
+
+  btn.disabled = false;
+  btn.innerHTML = `<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> 開始生成`;
+}
+
+async function generateOne(prompt, targetW, targetH, format, index) {
+  try {
+    // ── OpenAI DALL-E ──────────────────────────────────────────────────
+    if (provider === 'openai') {
+      if (!openaiKey) throw new Error('請先在設定中填入 OpenAI API Key');
+      const sizes = ['dall-e-3'].includes(dalleModel)
+        ? (targetW > targetH ? '1792x1024' : targetH > targetW ? '1024x1792' : '1024x1024')
+        : '1024x1024';
+      const body = {
+        model: dalleModel,
+        prompt,
+        n: 1,
+        size: sizes,
+        response_format: 'b64_json',
+        quality: 'standard'
+      };
+      const resp = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+        body: JSON.stringify(body)
+      });
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+      }
+      const data = await resp.json();
+      const b64 = data?.data?.[0]?.b64_json;
+      if (!b64) throw new Error('回應中無圖片資料');
+      const srcDataUrl = `data:image/png;base64,${b64}`;
+      const finalDataUrl = await resizeImage(srcDataUrl, targetW, targetH, format);
+      addToGallery(finalDataUrl, prompt, targetW, targetH, format);
+      return true;
+    }
+
+    // ── Google Gemini / Imagen ─────────────────────────────────────────
+    const isImagen = model.startsWith('imagen-');
+    let srcDataUrl;
+
+    if (isImagen) {
+      // Imagen API: predict endpoint, text-only
+      const aspectRatio = targetW >= targetH
+        ? (targetW / targetH >= 1.7 ? '16:9' : '1:1')
+        : (targetH / targetW >= 1.7 ? '9:16' : '1:1');
+
+      const body = {
+        instances: [{ prompt }],
+        parameters: { sampleCount: 1, aspectRatio }
+      };
+
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      );
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+      }
+      const data = await resp.json();
+      const pred = data?.predictions?.[0];
+      if (!pred) throw new Error('回應中無圖片資料');
+      const mime = pred.mimeType || 'image/png';
+      srcDataUrl = `data:${mime};base64,${pred.bytesBase64Encoded}`;
+
+    } else {
+      // Gemini generateContent endpoint: supports image input
+      const parts = [];
+      if (currentMode === 'edit' && uploadedImages.length > 0) {
+        for (const img of uploadedImages) {
+          const base64 = img.dataUrl.split(',')[1];
+          parts.push({ inlineData: { mimeType: img.file.type || 'image/jpeg', data: base64 } });
+        }
+      }
+      parts.push({ text: prompt });
+
+      const body = {
+        contents: [{ parts }],
+        generationConfig: { responseModalities: ['image', 'text'] }
+      };
+
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      );
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+      }
+      const data = await resp.json();
+      const imagePart = data?.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+      if (!imagePart) throw new Error('回應中無圖片資料');
+      srcDataUrl = `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+    }
+
+    const finalDataUrl = await resizeImage(srcDataUrl, targetW, targetH, format);
+    addToGallery(finalDataUrl, prompt, targetW, targetH, format);
+    return true;
+  } catch (e) {
+    console.error('生成失敗:', e);
+    showToast(`第 ${index+1} 張失敗：${e.message}`, 'error');
+    return false;
+  }
+}
+
+// ── Canvas Resize ──────────────────────────────────────────────────────
+function resizeImage(srcDataUrl, targetW, targetH, format) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d');
+      // Fill background for JPG
+      if (format === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0,0,targetW,targetH); }
+      // Contain fit
+      const scale = Math.min(targetW / img.width, targetH / img.height);
+      const sw = img.width * scale;
+      const sh = img.height * scale;
+      const dx = (targetW - sw) / 2;
+      const dy = (targetH - sh) / 2;
+      ctx.drawImage(img, dx, dy, sw, sh);
+      const quality = format === 'image/jpeg' ? 0.92 : undefined;
+      resolve(canvas.toDataURL(format, quality));
+    };
+    img.src = srcDataUrl;
+  });
+}
+
+// ── Gallery ────────────────────────────────────────────────────────────
+function addToGallery(dataUrl, prompt, w, h, format) {
+  const ext = format.split('/')[1];
+  const filename = `ai_${Date.now()}.${ext}`;
+  galleryItems.unshift({ dataUrl, prompt, w, h, format, filename });
+  renderGallery();
+}
+
+function renderGallery() {
+  const gallery = document.getElementById('gallery');
+  document.getElementById('galleryCount').textContent = `${galleryItems.length} 張`;
+
+  if (galleryItems.length === 0) {
+    gallery.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🎨</div><p>輸入描述後點擊「開始生成」</p></div>`;
+    return;
+  }
+
+  gallery.innerHTML = galleryItems.map((item, i) => `
+    <div class="gallery-card">
+      <div class="card-img-wrap">
+        <img src="${item.dataUrl}" alt="${item.prompt}" loading="lazy" onclick="openLightbox('${item.dataUrl}')">
+        <div class="card-overlay">
+          <button class="overlay-btn" onclick="openLightbox('${item.dataUrl}')">🔍 預覽</button>
+          <a class="overlay-btn" href="${item.dataUrl}" download="${item.filename}">⬇️ 下載</a>
+        </div>
+      </div>
+      <div class="card-info">
+        <div class="card-prompt">${escapeHtml(item.prompt)}</div>
+        <div class="card-meta">${item.w}×${item.h}px · ${item.format.split('/')[1].toUpperCase()}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function clearGallery() {
+  if (galleryItems.length === 0) return;
+  if (!confirm(`確定清除所有 ${galleryItems.length} 張記錄？`)) return;
+  galleryItems = [];
+  renderGallery();
+  showToast('已清除所有記錄', 'success');
+}
+
+// ── Lightbox ───────────────────────────────────────────────────────────
+function openLightbox(src) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+
+// ── Settings Modal ─────────────────────────────────────────────────────
+function onProviderChange() {
+  const p = document.getElementById('settingsProvider').value;
+  document.getElementById('googleSettings').style.display = p === 'google' ? 'block' : 'none';
+  document.getElementById('openaiSettings').style.display = p === 'openai' ? 'block' : 'none';
+}
+function openSettings() {
+  document.getElementById('settingsProvider').value = provider;
+  document.getElementById('settingsApiKey').value = apiKey;
+  document.getElementById('settingsModel').value = model;
+  document.getElementById('settingsOpenaiKey').value = openaiKey;
+  document.getElementById('settingsDalleModel').value = dalleModel;
+  onProviderChange();
+  document.getElementById('settingsModal').classList.add('open');
+}
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+function saveSettings() {
+  provider = document.getElementById('settingsProvider').value;
+  apiKey = document.getElementById('settingsApiKey').value.trim();
+  model = document.getElementById('settingsModel').value;
+  openaiKey = document.getElementById('settingsOpenaiKey').value.trim();
+  dalleModel = document.getElementById('settingsDalleModel').value;
+  localStorage.setItem('ai_provider', provider);
+  localStorage.setItem('gemini_api_key', apiKey);
+  localStorage.setItem('gemini_model', model);
+  localStorage.setItem('openai_api_key', openaiKey);
+  localStorage.setItem('dalle_model', dalleModel);
+  closeSettings();
+  showToast('設定已儲存', 'success');
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────
+function showToast(msg, type = 'info') {
+  const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+  const tc = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`;
+  tc.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
